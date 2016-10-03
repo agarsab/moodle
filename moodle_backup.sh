@@ -2,6 +2,9 @@
 #
 # FUNCION Makes a full backup of Moodle and its MySQL database
 
+EXIT_OK=0
+EXIT_ERROR=1
+
 MOODLE_SERVICE=httpd
 MOODLE_HOME='/var/www_vhost/moodle'
 BACKUP_HOME='/opt/backup'
@@ -16,7 +19,7 @@ MOODLE_CONFIG=$MOODLE_HOME'/config.php'
 
 if [ ! -f $MOODLE_CONFIG ]; then
     echo "ERROR: File not found "$MOODLE_CONFIG
-    exit 1
+    exit $EXIT_ERROR
 fi
 
 MOODLE_DBHOST=`get_parameter $MOODLE_CONFIG dbhost`
@@ -30,7 +33,8 @@ MOODLE_SQL=$MOODLE_BACKUP".sql"
 MOODLE_HTML_TGZ=$MOODLE_BACKUP"_html.tgz"
 MOODLE_DATA_TGZ=$MOODLE_BACKUP"_data.tgz"
 
-service $MOODLE_SERVICE stop
+# Enable maintenance mode
+mv $MOODLE_DATA/climaintenance.off $MOODLE_DATA/climaintenance.html
 
 echo "Dumping MySQL - Host:"$MOODLE_DBHOST" Database:"$MOODLE_DBNAME" User:"$MOODLE_DBUSR"..."
 mysqldump --add-drop-database --user=$MOODLE_DBUSR --password=$MOODLE_DBPWD --host=$MOODLE_DBHOST --add-drop-table --databases $MOODLE_DBNAME --result-file=$MOODLE_SQL
@@ -46,5 +50,9 @@ cd $MOODLE_DATA
 tar cvzf $MOODLE_DATA_TGZ * > /dev/null
 ls -lh $MOODLE_DATA_TGZ
 
-service $MOODLE_SERVICE start
-exit 0
+# Disable maintenance mode
+mv $MOODLE_DATA/climaintenance.html $MOODLE_DATA/climaintenance.off
+sync
+service $MOODLE_SERVICE graceful
+
+exit $EXIT_OK
